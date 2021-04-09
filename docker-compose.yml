@@ -1,6 +1,6 @@
 services:
   details:
     build: .
-    image: ghcr.io/bankhubjar/bookinfo-details:master
+    image: ghcr.io/bankhubjar/bookinfo-details:dev
     ports:
       - "9080:9080"
