@@ -34,8 +34,8 @@ spec:
     command:
     - cat
     tty: true
-  - name: java-node
-    image: timbru31/java-node:11-alpine-jre-14
+  - name: java-ruby
+    image: jruby:9.2.17.0-jre11
     command:
     - cat
     tty: true   
@@ -52,15 +52,15 @@ spec:
     environment {
     ENV_NAME = "${BRANCH_NAME == "master" ? "uat" : "${BRANCH_NAME}"}"
     SCANNER_HOME = tool 'sonarqube-scanner'
-    PROJECT_KEY = "bank-bookinfo-ratings"
-    PROJECT_NAME = "bank-bookinfo-ratings"
+    PROJECT_KEY = "bank-bookinfo-details"
+    PROJECT_NAME = "bank-bookinfo-details"
   }
 
   // Start Pipeline
   stages {
 
     // ***** Stage Clone *****
-    stage('Clone ratings source code') {
+    stage('Clone details source code') {
       // Steps to run build
       steps {
         // Run in Jenkins Slave container
@@ -70,7 +70,7 @@ spec:
             // Git clone repo and checkout branch as we put in parameter
             scmVars = git branch: "${BRANCH_NAME}",
                           credentialsId: 'Jenkins_deploykey',
-                          url: 'git@github.com:bankhubjar/bookinfo-ratings.git'
+                          url: 'git@github.com:bankhubjar/bookinfo-details.git'
           } // End script
         } // End container
       } // End steps
@@ -81,9 +81,9 @@ spec:
             container('helm') {
                 script {
                     // Generate k8s-manifest-deploy.yaml for scanning
-                    sh "helm template -f k8s/helm-values/values-bookinfo-${ENV_NAME}-ratings.yaml \
+                    sh "helm template -f k8s/helm-values/values-bookinfo-${ENV_NAME}-details.yaml \
                         --set extraEnv.COMMIT_ID=${scmVars.GIT_COMMIT} \
-                        --namespace bank-bookinfo-${ENV_NAME} bookinfo-${ENV_NAME}-ratings k8s/helm \
+                        --namespace bank-bookinfo-${ENV_NAME} bookinfo-${ENV_NAME}-details k8s/helm \
                         > k8s-manifest-deploy.yaml"
                 }
             }
@@ -102,7 +102,7 @@ spec:
     // ***** Stage Sonarqube *****
     stage('Sonarqube Scanner') {
         steps {
-            container('java-node'){
+            container('java-ruby'){
                 script {
                     // Authentiocation with http://sonarqube.hellodolphin.in.th
                     withSonarQubeEnv('sonarqube-scanner') {
@@ -127,41 +127,15 @@ spec:
         } // End steps
     } // End stage
 
-    // ***** Stage OWASP *****
-    stage('OWASP Dependency Check') {
-        steps {
-            container('java-node') {
-                script {
-                    // Install application dependency
-                    sh '''cd src/ && npm install --package-lock && cd ../'''
-
-                    // Start OWASP Dependency Check
-                    dependencyCheck(
-                        additionalArguments: "--data /home/jenkins/dependency-check-data --out dependency-check-report.xml",
-                        odcInstallation: "dependency-check"
-                    )
-
-                    // Publish report to Jenkins
-                    dependencyCheckPublisher(
-                        pattern: 'dependency-check-report.xml'
-                    )
-
-                    // Remove applocation dependency
-                    sh'''rm -rf src/node_modules src/package-lock.json'''
-                } // End script
-            } // End container
-        } // End steps
-    } // End stage
-
     // ***** Stage Build *****
-    stage('Build ratings Docker Image and push') {
+    stage('Build details Docker Image and push') {
       steps {
         container('docker') {
           script {
             // Do docker login authentication
             docker.withRegistry('https://ghcr.io', 'Github_Registry') {
               // Do docker build and docker push
-              docker.build('ghcr.io/bankhubjar/bookinfo-ratings:${ENV_NAME}').push()
+              docker.build('ghcr.io/bankhubjar/bookinfo-details:${ENV_NAME}').push()
             } // End docker.withRegistry
           } // End script
         } // End container
@@ -174,14 +148,14 @@ spec:
             container('jnlp') {
                 script {
                     // dend Docker Image to Anchore Analyzer
-                    writeFile file: 'anchore_images' , text: "ghcr.io/bankhubjar/bookinfo-ratings:${ENV_NAME}"
+                    writeFile file: 'anchore_images' , text: "ghcr.io/bankhubjar/bookinfo-details:${ENV_NAME}"
                     anchore name: 'anchore_images' , bailOnFail: false
                 } // End script
             } // End container
         } // End steps
     } // End stage
 
-    stage('Deploy ratings with Helm Chart') {
+    stage('Deploy details with Helm Chart') {
       steps {
         // Run on Helm container
         container('helm') {
@@ -189,9 +163,9 @@ spec:
             // Use kubeconfig from Jenkins Credential
             withKubeConfig([credentialsId: 'kubeconfig']) {
                 // Run Helm upgrade
-                sh "helm upgrade -i -f k8s/helm-values/values-bookinfo-${ENV_NAME}-ratings.yaml --wait \
+                sh "helm upgrade -i -f k8s/helm-values/values-bookinfo-${ENV_NAME}-details.yaml --wait \
                 --set extraEnv.COMMIT_ID=${scmVars.GIT_COMMIT} \
-                --namespace bank-bookinfo-${ENV_NAME} bookinfo-${ENV_NAME}-ratings k8s/helm"
+                --namespace bank-bookinfo-${ENV_NAME} bookinfo-${ENV_NAME}-details k8s/helm"
             } // End withKubeConfig
           } // End script
         } // End container
