@@ -11,13 +11,11 @@ metadata:
   namespace: {{ .Values.details.namespace }}
 spec:
   rules:
-  - host: {{ .Values.ingress.host }}
-    http:
-      paths:
-      - path: {{ .Values.ingress.path | default "/" }}
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ .Release.Name }}
-            port:
-              number: {{ .Values.details.port }}
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+        - path: {{ .Values.ingress.path | default "/" }}
+          pathType: Prefix
+          backend:
+            serviceName: {{ .Release.Name }}
+            servicePort: {{ .Values.details.port }}
