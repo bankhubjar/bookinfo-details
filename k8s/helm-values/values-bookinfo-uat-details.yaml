@@ -4,7 +4,7 @@ details:
   tag: uat
   replicas: 1
   imagePullSecrets: registry-bookinfo
-  port: 9080
+  port: 8082
   healthCheckPath: "/health"
 ingress:
   annotations:
